@@ -1,0 +1,964 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Almera E-Commerce API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: products
+  - name: orders
+  - name: auth
+  - name: admin
+  - name: settings
+  - name: legal
+  - name: account
+  - name: reviews
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      responses:
+        "200":
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: featured
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/{slug}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+
+  /products/{slug}/reviews:
+    get:
+      operationId: getProductReviews
+      tags: [reviews]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of reviews for this product
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+    post:
+      operationId: createProductReview
+      tags: [reviews]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequest"
+      responses:
+        "201":
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /orders:
+    post:
+      operationId: createOrder
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/track:
+    get:
+      operationId: trackOrder
+      tags: [orders]
+      parameters:
+        - name: orderNumber
+          in: query
+          schema: { type: string }
+        - name: phone
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Order tracking info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderWithItems"
+        "404":
+          description: Not found
+
+  /account/me:
+    get:
+      operationId: getAccountProfile
+      tags: [account]
+      responses:
+        "200":
+          description: Account profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProfile"
+    put:
+      operationId: updateAccountProfile
+      tags: [account]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProfile"
+
+  /account/orders:
+    get:
+      operationId: getAccountOrders
+      tags: [account]
+      responses:
+        "200":
+          description: User orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderWithItems"
+
+  /account/addresses:
+    get:
+      operationId: listAddresses
+      tags: [account]
+      responses:
+        "200":
+          description: User addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Address"
+    post:
+      operationId: createAddress
+      tags: [account]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAddressRequest"
+      responses:
+        "201":
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+
+  /account/addresses/{id}:
+    put:
+      operationId: updateAddress
+      tags: [account]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAddressRequest"
+      responses:
+        "200":
+          description: Updated address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+    delete:
+      operationId: deleteAddress
+      tags: [account]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  /account/reviews:
+    get:
+      operationId: getAccountReviews
+      tags: [account]
+      responses:
+        "200":
+          description: Reviews written by the user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+
+  /admin/orders:
+    get:
+      operationId: adminListOrders
+      tags: [admin]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Paginated orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedOrders"
+
+  /admin/orders/{id}:
+    patch:
+      operationId: adminUpdateOrder
+      tags: [admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderRequest"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /admin/stats:
+    get:
+      operationId: adminGetStats
+      tags: [admin]
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /admin/stats/extended:
+    get:
+      operationId: adminGetExtendedStats
+      tags: [admin]
+      responses:
+        "200":
+          description: Extended analytics stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtendedStats"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      responses:
+        "200":
+          description: Site settings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
+  /admin/settings:
+    put:
+      operationId: adminUpdateSettings
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        "200":
+          description: Settings updated
+
+  /legal/{slug}:
+    get:
+      operationId: getLegalPage
+      tags: [legal]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Legal page content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalPage"
+        "404":
+          description: Not found
+
+  /admin/legal:
+    get:
+      operationId: adminListLegalPages
+      tags: [admin]
+      responses:
+        "200":
+          description: All legal pages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LegalPage"
+
+  /admin/legal/{id}:
+    put:
+      operationId: adminUpdateLegalPage
+      tags: [admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLegalPageRequest"
+      responses:
+        "200":
+          description: Updated legal page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalPage"
+
+  /admin/products:
+    get:
+      operationId: adminListProducts
+      tags: [admin]
+      responses:
+        "200":
+          description: All products for admin
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: adminCreateProduct
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpsertRequest"
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /admin/products/{id}:
+    put:
+      operationId: adminUpdateProduct
+      tags: [admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpsertRequest"
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    delete:
+      operationId: adminDeleteProduct
+      tags: [admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  /admin/upload/product-image:
+    post:
+      operationId: adminUploadProductImage
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Uploaded image URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+
+  /admin/reviews:
+    get:
+      operationId: adminListReviews
+      tags: [admin]
+      responses:
+        "200":
+          description: All reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+
+  /admin/reviews/{id}:
+    delete:
+      operationId: adminDeleteReview
+      tags: [admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  /auth/session:
+    get:
+      operationId: getSession
+      tags: [auth]
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registered and logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      responses:
+        "200":
+          description: Logged out
+
+  /upload/payment:
+    post:
+      operationId: uploadPaymentScreenshot
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Uploaded screenshot URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status: { type: string }
+      required: [status]
+
+    UploadResponse:
+      type: object
+      properties:
+        url: { type: string }
+      required: [url]
+
+    ProductVariant:
+      type: object
+      properties:
+        size: { type: string }
+        color: { type: string }
+        quality: { type: string }
+        stock: { type: integer }
+      required: [size, color, quality, stock]
+
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        category: { type: string }
+        originalPrice: { type: number }
+        discountedPrice: { type: number }
+        images:
+          type: array
+          items: { type: string }
+        videos:
+          type: array
+          items: { type: string }
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductVariant"
+        rating: { type: number }
+        reviewCount: { type: integer }
+        isFeatured: { type: boolean }
+        isNew: { type: boolean }
+      required: [id, name, slug, description, category, originalPrice, discountedPrice, images, variants, rating, reviewCount, isFeatured, isNew]
+
+    ProductUpsertRequest:
+      type: object
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        category: { type: string }
+        originalPrice: { type: number }
+        discountedPrice: { type: number }
+        images:
+          type: array
+          items: { type: string }
+        videos:
+          type: array
+          items: { type: string }
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductVariant"
+        isFeatured: { type: boolean }
+        isNew: { type: boolean }
+      required: [name, slug, description, category, originalPrice, discountedPrice]
+
+    Review:
+      type: object
+      properties:
+        id: { type: string }
+        productId: { type: string }
+        productSlug: { type: string }
+        productName: { type: string }
+        userId:
+          type: string
+          nullable: true
+        authorName: { type: string }
+        rating: { type: integer }
+        title:
+          type: string
+          nullable: true
+        body: { type: string }
+        createdAt: { type: string }
+      required: [id, productId, productSlug, productName, authorName, rating, body, createdAt]
+
+    CreateReviewRequest:
+      type: object
+      properties:
+        authorName: { type: string }
+        rating: { type: integer }
+        title: { type: string }
+        body: { type: string }
+      required: [authorName, rating, body]
+
+    Address:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        recipientName: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        city: { type: string }
+        isDefault: { type: boolean }
+      required: [id, label, recipientName, phone, address, city, isDefault]
+
+    CreateAddressRequest:
+      type: object
+      properties:
+        label: { type: string }
+        recipientName: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        city: { type: string }
+        isDefault: { type: boolean }
+      required: [recipientName, phone, address, city]
+
+    AccountProfile:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        fullName:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        createdAt: { type: string }
+      required: [id, email, createdAt]
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        fullName: { type: string }
+        phone: { type: string }
+        currentPassword: { type: string }
+        newPassword: { type: string }
+
+    OrderItem:
+      type: object
+      properties:
+        productId: { type: string }
+        productName: { type: string }
+        productImage:
+          type: string
+          nullable: true
+        size: { type: string }
+        color: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        totalPrice: { type: number }
+      required: [productId, productName, size, color, quantity, unitPrice, totalPrice]
+
+    CreateOrderRequest:
+      type: object
+      properties:
+        customerName: { type: string }
+        customerEmail:
+          type: string
+          nullable: true
+        customerPhone: { type: string }
+        shippingAddress: { type: string }
+        shippingCity: { type: string }
+        paymentMethod: { type: string }
+        paymentScreenshotUrl:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+      required: [customerName, customerPhone, shippingAddress, shippingCity, paymentMethod, items]
+
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        orderNumber: { type: string }
+        customerName: { type: string }
+        customerEmail:
+          type: string
+          nullable: true
+        customerPhone: { type: string }
+        shippingAddress: { type: string }
+        shippingCity: { type: string }
+        paymentMethod: { type: string }
+        paymentScreenshotUrl:
+          type: string
+          nullable: true
+        paymentStatus: { type: string }
+        status: { type: string }
+        subtotal: { type: number }
+        deliveryFee: { type: number }
+        codFee: { type: number }
+        total: { type: number }
+        notes:
+          type: string
+          nullable: true
+        createdAt: { type: string }
+        updatedAt: { type: string }
+      required: [id, orderNumber, customerName, customerPhone, shippingAddress, shippingCity, paymentMethod, paymentStatus, status, subtotal, deliveryFee, codFee, total, createdAt, updatedAt]
+
+    OrderWithItems:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderItem"
+          required: [items]
+
+    UpdateOrderRequest:
+      type: object
+      properties:
+        status: { type: string }
+        paymentStatus: { type: string }
+
+    PaginatedOrders:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderWithItems"
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+      required: [data, total, page, limit]
+
+    DashboardStats:
+      type: object
+      properties:
+        totalOrders: { type: integer }
+        revenue: { type: number }
+        pendingOrders: { type: integer }
+        deliveredOrders: { type: integer }
+      required: [totalOrders, revenue, pendingOrders, deliveredOrders]
+
+    RevenueDataPoint:
+      type: object
+      properties:
+        date: { type: string }
+        revenue: { type: number }
+        orders: { type: integer }
+      required: [date, revenue, orders]
+
+    BestSeller:
+      type: object
+      properties:
+        productId: { type: string }
+        productName: { type: string }
+        totalSold: { type: integer }
+        totalRevenue: { type: number }
+      required: [productId, productName, totalSold, totalRevenue]
+
+    ExtendedStats:
+      type: object
+      properties:
+        totalOrders: { type: integer }
+        totalRevenue: { type: number }
+        totalProfit: { type: number }
+        pendingOrders: { type: integer }
+        processingOrders: { type: integer }
+        deliveredOrders: { type: integer }
+        cancelledOrders: { type: integer }
+        revenueByDay:
+          type: array
+          items:
+            $ref: "#/components/schemas/RevenueDataPoint"
+        bestSellers:
+          type: array
+          items:
+            $ref: "#/components/schemas/BestSeller"
+        statusBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { type: string }
+              count: { type: integer }
+            required: [status, count]
+        categoryBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              category: { type: string }
+              revenue: { type: number }
+              orders: { type: integer }
+            required: [category, revenue, orders]
+      required: [totalOrders, totalRevenue, totalProfit, pendingOrders, processingOrders, deliveredOrders, cancelledOrders, revenueByDay, bestSellers, statusBreakdown, categoryBreakdown]
+
+    LegalPage:
+      type: object
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        content: { type: string }
+        updatedAt: { type: string }
+      required: [id, slug, title, content, updatedAt]
+
+    UpdateLegalPageRequest:
+      type: object
+      properties:
+        title: { type: string }
+        content: { type: string }
+
+    SessionUser:
+      type: object
+      properties:
+        id: { type: string }
+        email:
+          type: string
+          nullable: true
+        fullName:
+          type: string
+          nullable: true
+        role: { type: string }
+        isLoggedIn: { type: boolean }
+      required: [id, role, isLoggedIn]
+
+    RegisterRequest:
+      type: object
+      properties:
+        email: { type: string }
+        password: { type: string }
+        fullName: { type: string }
+      required: [email, password]
+
+    LoginRequest:
+      type: object
+      properties:
+        email: { type: string }
+        password: { type: string }
+      required: [email, password]

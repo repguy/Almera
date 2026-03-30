@@ -1,0 +1,29 @@
+packages:
+  "framer-motion": "Animations and page transitions"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility function to efficiently merge Tailwind CSS classes"
+
+images:
+  - path: "artifacts/almera/public/images/hero-fashion.png"
+    description: "High fashion editorial shot of luxurious Pakistani ethnic wear, elegant gold and cream tones, cinematic lighting, wide shot"
+    aspect_ratio: "16:9"
+  - path: "artifacts/almera/public/images/cat-women.png"
+    description: "Elegant female model in traditional Pakistani luxury dress, sophisticated, warm lighting"
+    aspect_ratio: "3:4"
+  - path: "artifacts/almera/public/images/cat-men.png"
+    description: "Handsome male model in crisp traditional white shalwar kameez, premium tailored look"
+    aspect_ratio: "3:4"
+  - path: "artifacts/almera/public/images/cat-accessories.png"
+    description: "Luxurious embroidered silk dupatta and traditional jewelry close up, gold accents"
+    aspect_ratio: "3:4"
+  - path: "artifacts/almera/public/images/cat-footwear.png"
+    description: "Handcrafted traditional leather khussa shoes with gold embroidery, elegant display"
+    aspect_ratio: "3:4"
+  - path: "artifacts/almera/public/images/product-placeholder.png"
+    description: "Elegant clothing item folded beautifully on a premium texture background, warm lighting"
+    aspect_ratio: "3:4"
+
+notes:
+  - "The app relies on the API hooks generated in @workspace/api-client-react."
+  - "Auth is managed via standard cookies with useGetSession."
+  - "Wouter is used for routing as per constraints."
