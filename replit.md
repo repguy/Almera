@@ -184,12 +184,12 @@ pm2 startup
 
 #### Step 6 — Configure nginx
 
+**Without Cloudflare** (nginx handles SSL directly):
+
 ```nginx
 server {
     listen 80;
     server_name yourdomain.com www.yourdomain.com;
-
-    # Redirect HTTP → HTTPS (after you set up SSL below)
     return 301 https://$host$request_uri;
 }
 
@@ -197,31 +197,55 @@ server {
     listen 443 ssl http2;
     server_name yourdomain.com www.yourdomain.com;
 
-    # SSL — managed by Certbot (see below)
+    # SSL — managed by Certbot
     ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
-    # Serve the built React frontend
     root /var/www/almera/artifacts/almera/dist;
     index index.html;
-
-    # Increase upload limit for product images and payment screenshots
     client_max_body_size 25M;
 
-    # Proxy API requests to the Express server
     location /api/ {
         proxy_pass         http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-Proto $scheme;  # "https" because nginx is the SSL terminator
         proxy_read_timeout 60s;
     }
 
-    # SPA fallback — send all non-file requests to index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+**With Cloudflare** (Cloudflare handles SSL, nginx only on port 80):
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+
+    root /var/www/almera/artifacts/almera/dist;
+    index index.html;
+    client_max_body_size 25M;
+
+    location /api/ {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # CRITICAL: pass through the proto Cloudflare already set (https),
+        # not $scheme (which would be "http" since Cloudflare talks to nginx over HTTP)
+        proxy_set_header   X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_read_timeout 60s;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }
@@ -234,13 +258,49 @@ Test and reload nginx:
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-#### Step 7 — Free SSL with Certbot
+#### Step 7 — Free SSL with Certbot (skip if using Cloudflare SSL)
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
 # Auto-renewal is set up automatically
 ```
+
+---
+
+### Cloudflare-specific notes
+
+Cloudflare sits between the user and your server, which breaks sessions if not configured correctly. The app already has `trust proxy` enabled to handle this, but you also need the right settings on both sides.
+
+#### Cloudflare SSL mode
+
+Go to **Cloudflare Dashboard → SSL/TLS → Overview** and set the mode:
+
+| Mode | nginx listens on | Recommended? |
+|---|---|---|
+| Flexible | Port 80 (HTTP) | Works but less secure |
+| Full | Port 443 (self-signed cert OK) | Good |
+| Full (strict) | Port 443 (valid cert required) | Best — use Certbot |
+
+> **Do not use "Off"** — cookies will not be `Secure` and sessions will break.
+
+#### Cloudflare caching — disable for `/api/`
+
+By default Cloudflare may cache API responses, which breaks login. Create a **Cache Rule**:
+
+- URL pattern: `yourdomain.com/api/*`
+- Cache status: **Bypass**
+
+Or add this Page Rule: `yourdomain.com/api/*` → Cache Level: **Bypass**.
+
+#### Session cookie checklist
+
+If login still redirects you back to the login page after these changes, verify:
+
+1. `NODE_ENV=production` is set in your `.env` / PM2 environment
+2. The nginx config is passing `X-Forwarded-Proto` correctly (see above)
+3. Cloudflare SSL mode is **not** set to "Off" or "Flexible" with a non-HTTPS origin
+4. Run `pm2 restart almera-api` after any `.env` change — PM2 does not auto-reload env files
 
 ---
 

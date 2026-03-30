@@ -12,6 +12,12 @@ if (!process.env.SESSION_SECRET) {
 
 const app: Express = express();
 
+// Trust the first proxy in the chain (nginx / Cloudflare).
+// Without this, Express sees every request as plain HTTP even when the
+// browser connected over HTTPS, which breaks the Secure cookie flag and
+// causes sessions to be dropped after login.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
@@ -43,6 +49,7 @@ app.use(
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   })
