@@ -1,8 +1,32 @@
 import { Router, type IRouter } from "express";
 import { db, reviewsTable, productsTable } from "@workspace/db";
-import { eq, desc, avg, count } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+router.get("/reviews/featured", async (req, res): Promise<void> => {
+  const limit = parseInt((req.query.limit as string) || "12", 10);
+
+  const reviews = await db.select().from(reviewsTable)
+    .orderBy(desc(reviewsTable.createdAt))
+    .limit(limit);
+
+  const products = await db.select({ id: productsTable.id, slug: productsTable.slug, name: productsTable.name }).from(productsTable);
+  const productMap = Object.fromEntries(products.map(p => [p.id, p]));
+
+  res.json(reviews.map(r => ({
+    id: r.id,
+    productId: r.productId,
+    productSlug: productMap[r.productId]?.slug || "",
+    productName: productMap[r.productId]?.name || "",
+    userId: r.userId,
+    authorName: r.authorName,
+    rating: r.rating,
+    title: r.title,
+    body: r.body,
+    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+  })));
+});
 
 router.get("/products/:slug/reviews", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
@@ -53,7 +77,6 @@ router.post("/products/:slug/reviews", async (req, res): Promise<void> => {
     body,
   }).returning();
 
-  // Recalculate product rating
   const allReviews = await db.select().from(reviewsTable).where(eq(reviewsTable.productId, product.id));
   const avgRating = allReviews.reduce((s, r) => s + r.rating, 0) / allReviews.length;
 

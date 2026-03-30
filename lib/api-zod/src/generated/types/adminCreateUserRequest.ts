@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ExtendedStatsStatusBreakdownItem = {
-  status?: string;
-  count?: number;
-};
+export interface AdminCreateUserRequest {
+  email: string;
+  password: string;
+  fullName?: string;
+  role: string;
+}

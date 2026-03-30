@@ -6,7 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ExtendedStatsStatusBreakdownItem = {
-  status?: string;
-  count?: number;
-};
+export type AdminGetSettings200 = { [key: string]: string };

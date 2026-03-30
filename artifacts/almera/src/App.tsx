@@ -13,6 +13,7 @@ import Checkout from "@/pages/Checkout";
 import TrackOrder from "@/pages/TrackOrder";
 import Legal from "@/pages/Legal";
 import Admin from "@/pages/Admin";
+import Account from "@/pages/Account";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/shop" component={Shop} />
       <Route path="/product/:slug" component={ProductDetail} />
       <Route path="/auth" component={Auth} />
+      <Route path="/account" component={Account} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/track-order" component={TrackOrder} />
       <Route path="/legal/:slug" component={Legal} />

@@ -100,6 +100,26 @@ export const CreateProductReviewBody = zod.object({
   body: zod.string(),
 });
 
+export const GetFeaturedReviewsQueryParams = zod.object({
+  limit: zod.coerce.number().optional(),
+});
+
+export const GetFeaturedReviewsResponseItem = zod.object({
+  id: zod.string(),
+  productId: zod.string(),
+  productSlug: zod.string(),
+  productName: zod.string(),
+  userId: zod.string().nullish(),
+  authorName: zod.string(),
+  rating: zod.number(),
+  title: zod.string().nullish(),
+  body: zod.string(),
+  createdAt: zod.string(),
+});
+export const GetFeaturedReviewsResponse = zod.array(
+  GetFeaturedReviewsResponseItem,
+);
+
 export const CreateOrderBody = zod.object({
   customerName: zod.string(),
   customerEmail: zod.string().nullish(),
@@ -379,6 +399,19 @@ export const AdminGetStatsResponse = zod.object({
   deliveredOrders: zod.number(),
 });
 
+export const AdminGetExtendedStatsQueryParams = zod.object({
+  period: zod
+    .union([
+      zod.literal("today"),
+      zod.literal("week"),
+      zod.literal(30),
+      zod.literal(90),
+      zod.literal(365),
+      zod.literal("lifetime"),
+    ])
+    .optional(),
+});
+
 export const AdminGetExtendedStatsResponse = zod.object({
   totalOrders: zod.number(),
   totalRevenue: zod.number(),
@@ -404,20 +437,22 @@ export const AdminGetExtendedStatsResponse = zod.object({
   ),
   statusBreakdown: zod.array(
     zod.object({
-      status: zod.string(),
-      count: zod.number(),
+      status: zod.string().optional(),
+      count: zod.number().optional(),
     }),
   ),
   categoryBreakdown: zod.array(
     zod.object({
-      category: zod.string(),
-      revenue: zod.number(),
-      orders: zod.number(),
+      category: zod.string().optional(),
+      revenue: zod.number().optional(),
+      orders: zod.number().optional(),
     }),
   ),
 });
 
 export const GetSettingsResponse = zod.record(zod.string(), zod.string());
+
+export const AdminGetSettingsResponse = zod.record(zod.string(), zod.string());
 
 export const AdminUpdateSettingsBody = zod.record(zod.string(), zod.string());
 
@@ -588,7 +623,56 @@ export const AdminListReviewsResponseItem = zod.object({
 });
 export const AdminListReviewsResponse = zod.array(AdminListReviewsResponseItem);
 
+export const AdminCreateReviewBody = zod.object({
+  productId: zod.string(),
+  authorName: zod.string(),
+  rating: zod.number(),
+  title: zod.string().optional(),
+  body: zod.string(),
+});
+
 export const AdminDeleteReviewParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const AdminListUsersResponseItem = zod.object({
+  id: zod.string(),
+  email: zod.string(),
+  fullName: zod.string().nullish(),
+  role: zod.string(),
+  createdAt: zod.string(),
+  orderCount: zod.number(),
+});
+export const AdminListUsersResponse = zod.array(AdminListUsersResponseItem);
+
+export const AdminCreateUserBody = zod.object({
+  email: zod.string(),
+  password: zod.string(),
+  fullName: zod.string().optional(),
+  role: zod.string(),
+});
+
+export const AdminUpdateUserParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const AdminUpdateUserBody = zod.object({
+  email: zod.string().optional(),
+  fullName: zod.string().optional(),
+  role: zod.string().optional(),
+  password: zod.string().optional(),
+});
+
+export const AdminUpdateUserResponse = zod.object({
+  id: zod.string(),
+  email: zod.string(),
+  fullName: zod.string().nullish(),
+  role: zod.string(),
+  createdAt: zod.string(),
+  orderCount: zod.number(),
+});
+
+export const AdminDeleteUserParams = zod.object({
   id: zod.coerce.string(),
 });
 

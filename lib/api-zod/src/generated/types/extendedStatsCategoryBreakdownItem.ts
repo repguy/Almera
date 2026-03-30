@@ -7,7 +7,7 @@
  */
 
 export type ExtendedStatsCategoryBreakdownItem = {
-  category: string;
-  revenue: number;
-  orders: number;
+  category?: string;
+  revenue?: number;
+  orders?: number;
 };

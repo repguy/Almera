@@ -7,18 +7,12 @@ import Footer from '@/components/Footer';
 import CartDrawer from '@/components/CartDrawer';
 import WhatsAppWidget from '@/components/WhatsAppWidget';
 import ProductCard from '@/components/ProductCard';
-import { useListProducts } from '@workspace/api-client-react';
-
-const mockReviews = [
-  { id: 1, name: "Zara A.", city: "Lahore", text: "The embroidery details are breathtaking. Absolutely love the quality!", rating: 5 },
-  { id: 2, name: "Ayesha M.", city: "Karachi", text: "Fast delivery and the fabric is incredibly soft. My new favorite brand.", rating: 5 },
-  { id: 3, name: "Hassan K.", city: "Islamabad", text: "Got the white shalwar kameez. Perfect fit and premium feel.", rating: 4 },
-  { id: 4, name: "Fatima R.", city: "Peshawar", text: "Stunning designs! The colors are even better in person.", rating: 5 },
-];
+import { useListProducts, useGetFeaturedReviews } from '@workspace/api-client-react';
 
 export default function Home() {
   const { data: products = [], isLoading } = useListProducts({ featured: true });
-  
+  const { data: reviews = [] } = useGetFeaturedReviews({ limit: 12 });
+
   const heroImg = `${import.meta.env.BASE_URL}images/hero-fashion.png`;
   const catWomen = `${import.meta.env.BASE_URL}images/cat-women.png`;
   const catMen = `${import.meta.env.BASE_URL}images/cat-men.png`;
@@ -32,7 +26,7 @@ export default function Home() {
     { img: catFootwear, label: 'Footwear', href: '/shop?category=footwear' },
   ];
 
-  const doubledReviews = [...mockReviews, ...mockReviews, ...mockReviews];
+  const displayReviews = reviews.length > 0 ? [...reviews, ...reviews, ...reviews] : [];
 
   return (
     <div className="min-h-screen">
@@ -189,45 +183,47 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Reviews Marquee */}
-        <section className="py-24 overflow-hidden bg-background">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Loved Across the Nation
-            </h2>
-            <p className="text-muted-foreground">Join thousands of happy customers</p>
-          </div>
-
-          <div className="relative">
-            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-
-            <div className="flex animate-marquee hover:[animation-play-state:paused] w-max">
-              {doubledReviews.map((review, i) => (
-                <div
-                  key={`${review.id}-${i}`}
-                  className="flex-shrink-0 w-[350px] mx-4 p-8 rounded-2xl bg-card border border-border shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center gap-1 mb-4">
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <Star key={j} size={16} className={j < review.rating ? "fill-primary text-primary" : "text-muted"} />
-                    ))}
-                  </div>
-                  <p className="text-foreground text-base leading-relaxed mb-6">"{review.text}"</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full gradient-gold flex items-center justify-center text-sm font-bold text-primary-foreground shadow-inner">
-                      {review.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-foreground">{review.name}</p>
-                      <p className="text-xs font-medium text-muted-foreground">{review.city}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+        {/* Reviews — only show if there are real reviews */}
+        {displayReviews.length > 0 && (
+          <section className="py-24 overflow-hidden bg-background">
+            <div className="text-center mb-16">
+              <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                Loved Across the Nation
+              </h2>
+              <p className="text-muted-foreground">Join thousands of happy customers</p>
             </div>
-          </div>
-        </section>
+
+            <div className="relative">
+              <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+              <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+
+              <div className="flex animate-marquee hover:[animation-play-state:paused] w-max">
+                {displayReviews.map((review, i) => (
+                  <div
+                    key={`${review.id}-${i}`}
+                    className="flex-shrink-0 w-[350px] mx-4 p-8 rounded-2xl bg-card border border-border shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center gap-1 mb-4">
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <Star key={j} size={16} className={j < review.rating ? "fill-primary text-primary" : "text-muted"} />
+                      ))}
+                    </div>
+                    <p className="text-foreground text-base leading-relaxed mb-6">"{review.body}"</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full gradient-gold flex items-center justify-center text-sm font-bold text-primary-foreground shadow-inner">
+                        {review.authorName.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-foreground">{review.authorName}</p>
+                        <p className="text-xs font-medium text-muted-foreground">{review.productName}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />

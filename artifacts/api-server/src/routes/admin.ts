@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
-import { db, ordersTable, siteSettingsTable, legalPagesTable, productsTable, reviewsTable } from "@workspace/db";
-import { eq, desc, sum, count, sql } from "drizzle-orm";
+import { db, ordersTable, siteSettingsTable, legalPagesTable, productsTable, reviewsTable, usersTable } from "@workspace/db";
+import { eq, desc, count } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 
 const router: IRouter = Router();
 
@@ -14,7 +15,7 @@ async function requireAdmin(req: any, res: any): Promise<boolean> {
     res.status(401).json({ error: "Not authenticated" });
     return false;
   }
-  const [user] = await db.select().from((await import("@workspace/db")).usersTable).where(eq((await import("@workspace/db")).usersTable.id, session.userId));
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, session.userId));
   if (!user || user.role !== "admin") {
     res.status(403).json({ error: "Forbidden" });
     return false;
@@ -79,7 +80,7 @@ const productImageStorage = multer.diskStorage({
 });
 const uploadProductImage = multer({
   storage: productImageStorage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
       cb(null, true);
@@ -107,38 +108,79 @@ router.get("/admin/stats", async (req, res): Promise<void> => {
 router.get("/admin/stats/extended", async (req, res): Promise<void> => {
   if (!await requireAdmin(req, res)) return;
 
+  const period = (req.query.period as string) || "30";
   const allOrders = await db.select().from(ordersTable).orderBy(desc(ordersTable.createdAt));
 
-  const totalOrders = allOrders.length;
-  const deliveredOrders = allOrders.filter(o => o.status === "delivered").length;
-  const pendingOrders = allOrders.filter(o => o.status === "pending").length;
-  const processingOrders = allOrders.filter(o => o.status === "processing").length;
-  const cancelledOrders = allOrders.filter(o => o.status === "cancelled").length;
+  // Determine date range for filtering
+  let daysBack = 30;
+  let filterDate: Date | null = null;
 
-  const totalRevenue = allOrders
+  if (period === "today") {
+    filterDate = new Date();
+    filterDate.setHours(0, 0, 0, 0);
+  } else if (period === "week") {
+    filterDate = new Date();
+    filterDate.setDate(filterDate.getDate() - 7);
+  } else if (period === "90") {
+    filterDate = new Date();
+    filterDate.setDate(filterDate.getDate() - 90);
+    daysBack = 90;
+  } else if (period === "365") {
+    filterDate = new Date();
+    filterDate.setDate(filterDate.getDate() - 365);
+    daysBack = 365;
+  } else if (period === "lifetime") {
+    filterDate = null;
+    daysBack = 0;
+  } else {
+    // default: 30 days
+    filterDate = new Date();
+    filterDate.setDate(filterDate.getDate() - 30);
+    daysBack = 30;
+  }
+
+  // Filter orders for the selected period
+  const periodOrders = filterDate
+    ? allOrders.filter(o => new Date(o.createdAt) >= filterDate!)
+    : allOrders;
+
+  const totalOrders = periodOrders.length;
+  const deliveredOrders = periodOrders.filter(o => o.status === "delivered").length;
+  const pendingOrders = periodOrders.filter(o => o.status === "pending").length;
+  const processingOrders = periodOrders.filter(o => o.status === "processing").length;
+  const cancelledOrders = periodOrders.filter(o => o.status === "cancelled").length;
+
+  const totalRevenue = periodOrders
     .filter(o => o.status !== "cancelled")
     .reduce((s, o) => s + parseFloat(o.total as string), 0);
 
-  // Profit = revenue - (delivery fees + cod fees)
-  const totalProfit = allOrders
+  const totalProfit = periodOrders
     .filter(o => o.status !== "cancelled")
-    .reduce((s, o) => s + parseFloat(o.subtotal as string) * 0.3, 0); // estimate 30% margin
+    .reduce((s, o) => s + parseFloat(o.subtotal as string) * 0.3, 0);
 
-  // Revenue by day (last 30 days)
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const recentOrders = allOrders.filter(o => new Date(o.createdAt) >= thirtyDaysAgo && o.status !== "cancelled");
+  // Build revenue by day
+  let numDays = daysBack;
+  if (period === "today") numDays = 1;
+  else if (period === "week") numDays = 7;
+  else if (period === "lifetime") numDays = 60; // show last 60 days for lifetime
 
   const dayMap: Record<string, { revenue: number; orders: number }> = {};
-  for (let i = 29; i >= 0; i--) {
+  for (let i = numDays - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toISOString().split("T")[0];
     dayMap[key] = { revenue: 0, orders: 0 };
   }
 
-  for (const o of recentOrders) {
+  const ordersForChart = period === "lifetime"
+    ? allOrders.filter(o => {
+        const d = new Date();
+        d.setDate(d.getDate() - 60);
+        return new Date(o.createdAt) >= d && o.status !== "cancelled";
+      })
+    : periodOrders.filter(o => o.status !== "cancelled");
+
+  for (const o of ordersForChart) {
     const key = new Date(o.createdAt).toISOString().split("T")[0];
     if (dayMap[key]) {
       dayMap[key].revenue += parseFloat(o.total as string);
@@ -148,9 +190,9 @@ router.get("/admin/stats/extended", async (req, res): Promise<void> => {
 
   const revenueByDay = Object.entries(dayMap).map(([date, v]) => ({ date, ...v }));
 
-  // Best sellers from order items
+  // Best sellers from ALL orders (not filtered by period) for context
   const productSales: Record<string, { productId: string; productName: string; totalSold: number; totalRevenue: number }> = {};
-  for (const o of allOrders.filter(o => o.status !== "cancelled")) {
+  for (const o of periodOrders.filter(o => o.status !== "cancelled")) {
     const items = (o.items as any[]) || [];
     for (const item of items) {
       const key = item.productId;
@@ -166,18 +208,16 @@ router.get("/admin/stats/extended", async (req, res): Promise<void> => {
     .sort((a, b) => b.totalSold - a.totalSold)
     .slice(0, 5);
 
-  // Status breakdown
   const statusBreakdown = [
     { status: "pending", count: pendingOrders },
     { status: "processing", count: processingOrders },
-    { status: "shipped", count: allOrders.filter(o => o.status === "shipped").length },
+    { status: "shipped", count: periodOrders.filter(o => o.status === "shipped").length },
     { status: "delivered", count: deliveredOrders },
     { status: "cancelled", count: cancelledOrders },
   ];
 
-  // Category breakdown from products ordered
   const categoryMap: Record<string, { revenue: number; orders: number }> = {};
-  for (const o of allOrders.filter(o => o.status !== "cancelled")) {
+  for (const o of periodOrders.filter(o => o.status !== "cancelled")) {
     const items = (o.items as any[]) || [];
     for (const item of items) {
       const cat = item.category || "other";
@@ -330,10 +370,172 @@ router.get("/admin/reviews", async (req, res): Promise<void> => {
   })));
 });
 
+router.post("/admin/reviews", async (req, res): Promise<void> => {
+  if (!await requireAdmin(req, res)) return;
+
+  const { productId, authorName, rating, title, body } = req.body;
+  if (!productId || !authorName || rating == null || !body) {
+    res.status(400).json({ error: "productId, authorName, rating, and body are required" });
+    return;
+  }
+  if (rating < 1 || rating > 5) {
+    res.status(400).json({ error: "Rating must be 1-5" });
+    return;
+  }
+
+  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, productId));
+  if (!product) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  const [review] = await db.insert(reviewsTable).values({
+    productId,
+    userId: null,
+    authorName,
+    rating: parseInt(String(rating), 10),
+    title: title || null,
+    body,
+  }).returning();
+
+  // Recalculate product rating
+  const allReviews = await db.select().from(reviewsTable).where(eq(reviewsTable.productId, productId));
+  const avgRating = allReviews.reduce((s, r) => s + r.rating, 0) / allReviews.length;
+  await db.update(productsTable).set({
+    rating: String(avgRating.toFixed(1)),
+    reviewCount: allReviews.length,
+  }).where(eq(productsTable.id, productId));
+
+  res.status(201).json({
+    id: review.id,
+    productId: review.productId,
+    productSlug: product.slug,
+    productName: product.name,
+    userId: review.userId,
+    authorName: review.authorName,
+    rating: review.rating,
+    title: review.title,
+    body: review.body,
+    createdAt: review.createdAt instanceof Date ? review.createdAt.toISOString() : review.createdAt,
+  });
+});
+
 router.delete("/admin/reviews/:id", async (req, res): Promise<void> => {
   if (!await requireAdmin(req, res)) return;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  await db.delete(reviewsTable).where(eq(reviewsTable.id, raw));
+
+  // Get review to find productId for rating recalculation
+  const [review] = await db.select().from(reviewsTable).where(eq(reviewsTable.id, raw));
+  if (review) {
+    await db.delete(reviewsTable).where(eq(reviewsTable.id, raw));
+    // Recalculate rating
+    const remaining = await db.select().from(reviewsTable).where(eq(reviewsTable.productId, review.productId));
+    const avgRating = remaining.length ? remaining.reduce((s, r) => s + r.rating, 0) / remaining.length : 0;
+    await db.update(productsTable).set({
+      rating: String(avgRating.toFixed(1)),
+      reviewCount: remaining.length,
+    }).where(eq(productsTable.id, review.productId));
+  }
+
+  res.status(204).end();
+});
+
+// ─── Users (Account Management) ──────────────────────────────────────────────
+router.get("/admin/users", async (req, res): Promise<void> => {
+  if (!await requireAdmin(req, res)) return;
+
+  const users = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
+  const orders = await db.select({ userId: ordersTable.userId }).from(ordersTable);
+
+  const orderCounts: Record<string, number> = {};
+  for (const o of orders) {
+    if (o.userId) orderCounts[o.userId] = (orderCounts[o.userId] || 0) + 1;
+  }
+
+  res.json(users.map(u => ({
+    id: u.id,
+    email: u.email,
+    fullName: u.fullName,
+    role: u.role,
+    createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
+    orderCount: orderCounts[u.id] || 0,
+  })));
+});
+
+router.post("/admin/users", async (req, res): Promise<void> => {
+  if (!await requireAdmin(req, res)) return;
+
+  const { email, password, fullName, role } = req.body;
+  if (!email || !password || !role) {
+    res.status(400).json({ error: "email, password, and role are required" });
+    return;
+  }
+
+  const existing = await db.select().from(usersTable).where(eq(usersTable.email, email));
+  if (existing.length > 0) {
+    res.status(409).json({ error: "Email already registered" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const [user] = await db.insert(usersTable).values({
+    email,
+    passwordHash,
+    fullName: fullName || null,
+    role,
+  }).returning();
+
+  res.status(201).json({
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    role: user.role,
+    createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
+    orderCount: 0,
+  });
+});
+
+router.patch("/admin/users/:id", async (req, res): Promise<void> => {
+  if (!await requireAdmin(req, res)) return;
+
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { email, fullName, role, password } = req.body;
+
+  const updates: Record<string, any> = {};
+  if (email !== undefined) updates.email = email;
+  if (fullName !== undefined) updates.fullName = fullName;
+  if (role !== undefined) updates.role = role;
+  if (password) updates.passwordHash = await bcrypt.hash(password, 12);
+
+  const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, raw)).returning();
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const orderRows = await db.select({ userId: ordersTable.userId }).from(ordersTable).where(eq(ordersTable.userId, raw));
+  res.json({
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    role: user.role,
+    createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
+    orderCount: orderRows.length,
+  });
+});
+
+router.delete("/admin/users/:id", async (req, res): Promise<void> => {
+  if (!await requireAdmin(req, res)) return;
+
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  // Prevent deleting own account
+  const session = req.session as any;
+  if (session?.userId === raw) {
+    res.status(400).json({ error: "Cannot delete your own account" });
+    return;
+  }
+
+  await db.delete(usersTable).where(eq(usersTable.id, raw));
   res.status(204).end();
 });
 

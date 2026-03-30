@@ -71,6 +71,37 @@ export interface CreateReviewRequest {
   body: string;
 }
 
+export interface AdminCreateReviewRequest {
+  productId: string;
+  authorName: string;
+  rating: number;
+  title?: string;
+  body: string;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  fullName?: string | null;
+  role: string;
+  createdAt: string;
+  orderCount: number;
+}
+
+export interface AdminCreateUserRequest {
+  email: string;
+  password: string;
+  fullName?: string;
+  role: string;
+}
+
+export interface AdminUpdateUserRequest {
+  email?: string;
+  fullName?: string;
+  role?: string;
+  password?: string;
+}
+
 export interface Address {
   id: string;
   label: string;
@@ -186,14 +217,14 @@ export interface BestSeller {
 }
 
 export type ExtendedStatsStatusBreakdownItem = {
-  status: string;
-  count: number;
+  status?: string;
+  count?: number;
 };
 
 export type ExtendedStatsCategoryBreakdownItem = {
-  category: string;
-  revenue: number;
-  orders: number;
+  category?: string;
+  revenue?: number;
+  orders?: number;
 };
 
 export interface ExtendedStats {
@@ -208,19 +239,6 @@ export interface ExtendedStats {
   bestSellers: BestSeller[];
   statusBreakdown: ExtendedStatsStatusBreakdownItem[];
   categoryBreakdown: ExtendedStatsCategoryBreakdownItem[];
-}
-
-export interface LegalPage {
-  id: string;
-  slug: string;
-  title: string;
-  content: string;
-  updatedAt: string;
-}
-
-export interface UpdateLegalPageRequest {
-  title?: string;
-  content?: string;
 }
 
 export interface SessionUser {
@@ -242,9 +260,26 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface LegalPage {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  updatedAt: string;
+}
+
+export interface UpdateLegalPageRequest {
+  title?: string;
+  content?: string;
+}
+
 export type ListProductsParams = {
   category?: string;
   featured?: boolean;
+};
+
+export type GetFeaturedReviewsParams = {
+  limit?: number;
 };
 
 export type TrackOrderParams = {
@@ -258,7 +293,25 @@ export type AdminListOrdersParams = {
   limit?: number;
 };
 
+export type AdminGetExtendedStatsParams = {
+  period?: AdminGetExtendedStatsPeriod;
+};
+
+export type AdminGetExtendedStatsPeriod =
+  (typeof AdminGetExtendedStatsPeriod)[keyof typeof AdminGetExtendedStatsPeriod];
+
+export const AdminGetExtendedStatsPeriod = {
+  today: "today",
+  week: "week",
+  NUMBER_30: 30,
+  NUMBER_90: 90,
+  NUMBER_365: 365,
+  lifetime: "lifetime",
+} as const;
+
 export type GetSettings200 = { [key: string]: string };
+
+export type AdminGetSettings200 = { [key: string]: string };
 
 export type AdminUpdateSettingsBody = { [key: string]: string };
 

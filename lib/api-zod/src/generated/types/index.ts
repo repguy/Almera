@@ -8,9 +8,16 @@
 
 export * from "./accountProfile";
 export * from "./address";
+export * from "./adminCreateReviewRequest";
+export * from "./adminCreateUserRequest";
+export * from "./adminGetExtendedStatsParams";
+export * from "./adminGetExtendedStatsPeriod";
+export * from "./adminGetSettings200";
 export * from "./adminListOrdersParams";
 export * from "./adminUpdateSettingsBody";
+export * from "./adminUpdateUserRequest";
 export * from "./adminUploadProductImageBody";
+export * from "./adminUser";
 export * from "./bestSeller";
 export * from "./createAddressRequest";
 export * from "./createOrderRequest";
@@ -19,6 +26,7 @@ export * from "./dashboardStats";
 export * from "./extendedStats";
 export * from "./extendedStatsCategoryBreakdownItem";
 export * from "./extendedStatsStatusBreakdownItem";
+export * from "./getFeaturedReviewsParams";
 export * from "./getSettings200";
 export * from "./healthStatus";
 export * from "./legalPage";
