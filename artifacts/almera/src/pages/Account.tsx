@@ -5,7 +5,7 @@ import {
   useGetAccountProfile, useUpdateAccountProfile,
   useGetAccountOrders,
   useListAddresses, useCreateAddress, useUpdateAddress, useDeleteAddress,
-  useGetAccountReviews,
+  useGetAccountReviews, useCreateProductReview,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -17,9 +17,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, ShoppingBag, MapPin, Star, Pencil, Trash2, Plus, X, CheckCircle2, Package, Truck, Clock, ChevronRight } from 'lucide-react';
+import { User, ShoppingBag, MapPin, Star, Pencil, Trash2, Plus, X, CheckCircle2, Package, Truck, Clock, ChevronRight, Edit3 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
@@ -348,37 +349,155 @@ function AddressesTab() {
 
 // ─── Reviews Tab ──────────────────────────────────────────────────────────────
 function ReviewsTab() {
-  const { data: reviews, isLoading } = useGetAccountReviews();
+  const { data: reviews, isLoading: reviewsLoading } = useGetAccountReviews();
+  const { data: orders, isLoading: ordersLoading } = useGetAccountOrders();
+  const { data: session } = useGetSession();
+  const createReview = useCreateProductReview();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  if (isLoading) return <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  const [writingFor, setWritingFor] = useState<{ slug: string; name: string } | null>(null);
+  const [form, setForm] = useState({ authorName: '', rating: 5, title: '', body: '' });
 
-  if (!reviews?.length) return (
-    <div className="text-center py-16 bg-card rounded-3xl border border-border">
-      <Star size={48} className="text-muted-foreground/30 mx-auto mb-4" />
-      <h3 className="font-bold text-lg mb-2">No reviews yet</h3>
-      <p className="text-muted-foreground">Share your thoughts on products you have purchased.</p>
-    </div>
+  useEffect(() => {
+    if (session?.fullName) setForm(f => ({ ...f, authorName: f.authorName || session.fullName || '' }));
+  }, [session]);
+
+  if (reviewsLoading || ordersLoading) return (
+    <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
   );
 
+  const reviewedProductIds = new Set((reviews || []).map(r => r.productId));
+
+  const purchasedProducts: { slug: string; name: string; image?: string; productId: string }[] = [];
+  const seen = new Set<string>();
+  for (const order of (orders || [])) {
+    for (const item of (order as any).items || []) {
+      if (!seen.has(item.productId)) {
+        seen.add(item.productId);
+        purchasedProducts.push({ slug: item.productSlug || '', name: item.productName || '', image: item.productImage, productId: item.productId });
+      }
+    }
+  }
+
+  const unreviewed = purchasedProducts.filter(p => !reviewedProductIds.has(p.productId) && p.slug);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!writingFor || !form.body.trim() || !form.authorName.trim()) return;
+    createReview.mutate(
+      { slug: writingFor.slug, data: { authorName: form.authorName, rating: form.rating, title: form.title || undefined, body: form.body } },
+      {
+        onSuccess: () => {
+          toast({ title: 'Review submitted! Thank you.' });
+          setWritingFor(null);
+          setForm(f => ({ ...f, rating: 5, title: '', body: '' }));
+          queryClient.invalidateQueries({ queryKey: ['/api/account/reviews'] });
+          queryClient.invalidateQueries({ queryKey: [`/api/products/${writingFor.slug}/reviews`] });
+        },
+        onError: () => toast({ title: 'Failed to submit review', variant: 'destructive' }),
+      }
+    );
+  };
+
   return (
-    <div className="space-y-4">
-      {reviews.map(r => (
-        <div key={r.id} className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <div>
-              <Link href={`/product/${r.productSlug}`} className="font-bold hover:text-primary transition-colors">{r.productName}</Link>
-              {r.title && <p className="text-sm font-medium mt-0.5">{r.title}</p>}
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} size={14} className={i < r.rating ? 'fill-primary text-primary' : 'fill-muted text-muted'} />
+    <div className="space-y-6">
+      {/* Products to review */}
+      {unreviewed.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Edit3 size={16} className="text-primary" />
+            <h3 className="font-bold">Write a Review</h3>
+            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">{unreviewed.length} pending</span>
+          </div>
+
+          {writingFor ? (
+            <motion.form initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} onSubmit={handleSubmit} className="space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <button type="button" onClick={() => setWritingFor(null)} className="text-muted-foreground hover:text-foreground transition-colors"><X size={16} /></button>
+                <span className="font-bold text-sm">{writingFor.name}</span>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase text-muted-foreground">Your Name *</Label>
+                <Input value={form.authorName} onChange={e => setForm({ ...form, authorName: e.target.value })} required className="h-11 rounded-xl" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase text-muted-foreground">Rating *</Label>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button key={n} type="button" onClick={() => setForm({ ...form, rating: n })}
+                      className="transition-transform hover:scale-110">
+                      <Star size={28} className={n <= form.rating ? 'fill-primary text-primary' : 'fill-muted text-muted'} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase text-muted-foreground">Review Title</Label>
+                <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Brief summary" className="h-11 rounded-xl" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase text-muted-foreground">Review *</Label>
+                <Textarea required value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} placeholder="Share your experience with this product…" className="min-h-[100px] rounded-xl text-sm" />
+              </div>
+              <div className="flex gap-3">
+                <Button type="submit" disabled={createReview.isPending} className="gradient-gold rounded-xl font-bold">
+                  {createReview.isPending ? 'Submitting…' : 'Submit Review'}
+                </Button>
+                <Button type="button" variant="outline" className="rounded-xl" onClick={() => setWritingFor(null)}>Cancel</Button>
+              </div>
+            </motion.form>
+          ) : (
+            <div className="space-y-2">
+              {unreviewed.map(p => (
+                <div key={p.productId} className="flex items-center gap-3 bg-muted/30 rounded-xl p-3">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                    {p.image && <img src={p.image} alt={p.name} className="w-full h-full object-cover" />}
+                  </div>
+                  <p className="flex-1 font-medium text-sm truncate">{p.name}</p>
+                  <Button size="sm" className="rounded-lg gradient-gold text-primary-foreground font-bold h-8 text-xs flex-shrink-0"
+                    onClick={() => setWritingFor({ slug: p.slug, name: p.name })}>
+                    <Star size={12} className="mr-1" /> Review
+                  </Button>
+                </div>
               ))}
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">{r.body}</p>
-          <p className="text-xs text-muted-foreground mt-2">{new Date(r.createdAt).toLocaleDateString('en-PK', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          )}
         </div>
-      ))}
+      )}
+
+      {/* Existing reviews */}
+      {reviews && reviews.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Your Reviews</h3>
+          {reviews.map(r => (
+            <div key={r.id} className="bg-card rounded-2xl border border-border p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div>
+                  <Link href={`/product/${r.productSlug}`} className="font-bold hover:text-primary transition-colors">{r.productName}</Link>
+                  {r.title && <p className="text-sm font-medium mt-0.5">{r.title}</p>}
+                </div>
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} size={13} className={i < r.rating ? 'fill-primary text-primary' : 'fill-muted text-muted'} />
+                  ))}
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">{r.body}</p>
+              <p className="text-xs text-muted-foreground mt-2">{new Date(r.createdAt).toLocaleDateString('en-PK', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!reviews?.length && unreviewed.length === 0 && (
+        <div className="text-center py-16 bg-card rounded-3xl border border-border">
+          <Star size={48} className="text-muted-foreground/30 mx-auto mb-4" />
+          <h3 className="font-bold text-lg mb-2">No reviews yet</h3>
+          <p className="text-muted-foreground mb-4">Place an order and share your thoughts on products you receive.</p>
+          <Link href="/shop"><Button className="gradient-gold rounded-xl">Shop Now</Button></Link>
+        </div>
+      )}
     </div>
   );
 }

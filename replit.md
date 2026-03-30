@@ -37,28 +37,42 @@ almera-monorepo/
 
 ## Pages
 
-- `/` — Homepage (hero, categories, featured products, reviews)
+- `/` — Homepage (hero, categories, featured products, real reviews only)
 - `/shop` — Full product catalog with category filter & sort
-- `/product/:slug` — Product detail with variant selector
+- `/product/:slug` — Product detail with variant selector + customer review form
 - `/auth` — Login / Register
 - `/checkout` — Checkout form (COD, Easypaisa, Bank Transfer)
 - `/track-order` — Order tracking by order number or phone
+- `/account` — Customer portal (orders, saved addresses, write reviews for purchases, profile)
 - `/legal/:slug` — Legal pages (terms, privacy, refund)
-- `/admin` — Admin panel (Dashboard, Orders, Settings, Legal pages)
+- `/admin` — Admin panel (Dashboard with period stats, Orders + proof viewer, Products CRUD, Reviews + fake review tool, Users CRUD, Settings, Legal)
 
 ## Admin Access
 
 Default admin: `admin@almera.pk` / `admin123`
 **Change this password after first login via the Auth page.**
 
+## First-Run Setup (Required on Fresh Environment)
+
+```bash
+# 1. Install all dependencies
+pnpm install
+
+# 2. Push the DB schema (creates all tables)
+pnpm --filter @workspace/db run push
+
+# 3. Seed the database (admin user, products, settings)
+pnpm --filter @workspace/scripts run seed
+```
+
 ## Key Commands
 
 ```bash
-# Run seed script (first-time setup)
-pnpm --filter @workspace/scripts run seed
-
-# Push DB schema changes
+# Push DB schema changes (after schema edits)
 pnpm --filter @workspace/db run push
+
+# Re-seed database (adds admin + sample data)
+pnpm --filter @workspace/scripts run seed
 
 # Regenerate API client from OpenAPI spec
 pnpm --filter @workspace/api-spec run codegen
